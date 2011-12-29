@@ -15,14 +15,14 @@ class StatsdServer(object):
         self.ratecheck = re.compile('^@([\d\.]+)')
         self.counters = {}
         self.timers = {}
-        self.percent_threshold = 90
+        self.pct_threshold = 90
         self.stats_seen = 0
         self.debug = True
 
     def report_stats(self, payload):
         """
         Send data to graphite host
-        
+
         :param payload: Data to send to graphite
         """
         if self.debug:
@@ -57,29 +57,38 @@ class StatsdServer(object):
                 payload.append(stats)
                 payload.append(stats_counts)
                 self.counters[item] = 0
-
-            for item in self.timers:
-                if len(self.timers[item]) > 0:
-                    count = len(self.timers[item])
-                    low = min(self.timers[item])
-                    high = max(self.timers[item])
-                    total = sum(self.timers[item])
+            for key in self.timers:
+                if len(self.timers[key]) > 0:
+                    count = len(self.timers[key])
+                    low = min(self.timers[key])
+                    high = max(self.timers[key])
+                    total = sum(self.timers[key])
                     mean = low
                     max_threshold = high
+                    tstamp = int(time.time())
                     if count > 1:
-                        threshold_index = int((self.percent_threshold / 100.0) * count)
-                        max_threshold = self.timers[item][threshold_index - 1]
-                        total = sum(v)
+                        threshold_index = \
+                            int((self.pct_threshold / 100.0) * count)
+                        max_threshold = self.timers[key][threshold_index - 1]
                         mean = total / count
-                    self.timers[item] = []
-
+                    payload.append("stats.timers.%s.mean %d ts %d\n" % \
+                            (key, mean, tstamp))
+                    payload.append("stats.timers.%s.upper %d ts %d\n" % \
+                            (key, max, tstamp))
+                    payload.append("stats.timers.%s.upper_%d %d ts %d\n" % \
+                            (key, self.pct_threshold, max_threshold, tstamp))
+                    payload.append("stats.timers.%s.lower %d ts %d\n" % \
+                            (key, low, tstamp))
+                    payload.append("stats.timers.%s.count %d ts %d\n" % \
+                            (key, count, tstamp))
+                    self.timers[key] = []
             if payload:
                 self.report_stats("".join(payload))
-    
+
     def process_timer(self, key, fields):
         """
         Process a received timer event
-        
+
         :param key: Key of timer
         :param fields: Received fields
         """
@@ -90,18 +99,18 @@ class StatsdServer(object):
             self.stats_seen += 1
         except Exception as err:
             print "error decoding timer event: %s" % err
-        
+
     def process_counter(self, key, fields):
         """
         Process a received counter event
-        
+
         :param key: Key of counter
         :param fields: Received fields
         """
         try:
             if key not in self.counters:
                 self.counters[key] = 0
-            if field_count is 3:
+            if len(fields) is 3:
                 if self.ratecheck.match(fields[2]):
                     sample_rate = float(fields[2].lstrip("@"))
                 else:
@@ -115,7 +124,7 @@ class StatsdServer(object):
     def decode_recvd(self, data):
         """
         Decode and process the data from a received event.
-        
+
         :param data: Data to decode and process.
         """
         bits = data.split(':')
@@ -144,7 +153,6 @@ class StatsdServer(object):
         buf = 8192
         print "Listening on %s:%d" % addr
         while 1:
-            sample_rate = 1.0
             data, addr = sock.recvfrom(buf)
             if not data:
                 break
