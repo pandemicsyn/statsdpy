@@ -14,10 +14,17 @@ class StatsdServer(object):
         self.keycheck = re.compile(r'\s+|/|[^a-zA-Z_\-0-9\.]')
         self.ratecheck = re.compile('^@([\d\.]+)')
         self.counters = {}
+        self.timers = {}
+        self.percent_threshold = 90
         self.stats_seen = 0
         self.debug = True
 
     def report_stats(self, payload):
+        """
+        Send data to graphite host
+        
+        :param payload: Data to send to graphite
+        """
         if self.debug:
             print "reporting stats"
         try:
@@ -30,6 +37,9 @@ class StatsdServer(object):
             print "error connecting to graphite: %s" % err
 
     def stats_flush(self):
+        """
+        Periodically flush stats to graphite
+        """
         tstamp = int(time.time())
         flush_interval = 10 #seconds not milli
         payload = []
@@ -47,10 +57,67 @@ class StatsdServer(object):
                 payload.append(stats)
                 payload.append(stats_counts)
                 self.counters[item] = 0
+
+            for item in self.timers:
+                if len(self.timers[item]) > 0:
+                    count = len(self.timers[item])
+                    low = min(self.timers[item])
+                    high = max(self.timers[item])
+                    total = sum(self.timers[item])
+                    mean = low
+                    max_threshold = high
+                    if count > 1:
+                        threshold_index = int((self.percent_threshold / 100.0) * count)
+                        max_threshold = self.timers[item][threshold_index - 1]
+                        total = sum(v)
+                        mean = total / count
+                    self.timers[item] = []
+
             if payload:
                 self.report_stats("".join(payload))
+    
+    def process_timer(self, key, fields):
+        """
+        Process a received timer event
+        
+        :param key: Key of timer
+        :param fields: Received fields
+        """
+        try:
+            if key not in self.timers:
+                self.timers[key] = []
+            self.timers[key].append(float(fields[0] or 0))
+            self.stats_seen += 1
+        except Exception as err:
+            print "error decoding timer event: %s" % err
+        
+    def process_counter(self, key, fields):
+        """
+        Process a received counter event
+        
+        :param key: Key of counter
+        :param fields: Received fields
+        """
+        try:
+            if key not in self.counters:
+                self.counters[key] = 0
+            if field_count is 3:
+                if self.ratecheck.match(fields[2]):
+                    sample_rate = float(fields[2].lstrip("@"))
+                else:
+                    raise Exception("bad sample rate.")
+            self.counters[key] += float(fields[0] or 1) * \
+                (1 / float(sample_rate))
+            self.stats_seen += 1
+        except Exception as err:
+            print "error decoding counter event: %s" % err
 
     def decode_recvd(self, data):
+        """
+        Decode and process the data from a received event.
+        
+        :param data: Data to decode and process.
+        """
         bits = data.split(':')
         if len(bits) == 2:
             key = self.keycheck.sub('_', bits[0])
@@ -59,21 +126,9 @@ class StatsdServer(object):
             field_count = len(fields)
             if field_count >= 2:
                 if fields[1] is "ms":
-                    print "error: no timer support yet."
+                    self.process_timer(key, fields)
                 elif fields[1] is "c":
-                    try:
-                        if key not in self.counters:
-                            self.counters[key] = 0
-                        if field_count is 3:
-                            if self.ratecheck.match(fields[2]):
-                                sample_rate = float(fields[2].lstrip("@"))
-                            else:
-                                raise Exception("bad sample rate.")
-                        self.counters[key] += float(fields[0] or 1) * \
-                            (1 / float(sample_rate))
-                    except Exception as err:
-                        print "error decoding packet: %s" % err
-                    self.stats_seen += 1
+                    self.process_counter(key, fields)
                 else:
                     print "error: unsupported stats type"
             else:
@@ -104,7 +159,7 @@ class Statsd(Daemon):
         server.run()
 
 
-def main():
+def run_server():
     usage = '''
     %prog start|stop|restart [--conf=/path/to/some.conf] [--foreground|-f]
     '''
@@ -149,7 +204,4 @@ def main():
         sys.exit(2)
 
 if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        print "\n"
+    run_server()
