@@ -11,7 +11,7 @@ try:
 except ImportError:
     install_requires.append("simplejson")
 
-name = "statsdlog"
+name = "statsdpy"
 
 setup(
     name = name,
@@ -33,3 +33,4 @@ setup(
     install_requires=install_requires,
     scripts=['bin/statsdpy-server']
     )
+

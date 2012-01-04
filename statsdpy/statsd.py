@@ -26,7 +26,7 @@ class StatsdServer(object):
         :param payload: Data to send to graphite
         """
         if self.debug:
-            print "reporting stats"
+            print "reporting stats -> %s" % payload
         try:
             with eventlet.Timeout(5, True) as timeout:
                 graphite = socket.socket()
@@ -84,6 +84,7 @@ class StatsdServer(object):
                     self.timers[key] = []
             if payload:
                 self.report_stats("".join(payload))
+                payload = []
 
     def process_timer(self, key, fields):
         """
@@ -107,16 +108,17 @@ class StatsdServer(object):
         :param key: Key of counter
         :param fields: Received fields
         """
+        sample_rate = 1.0
         try:
-            if key not in self.counters:
-                self.counters[key] = 0
             if len(fields) is 3:
                 if self.ratecheck.match(fields[2]):
                     sample_rate = float(fields[2].lstrip("@"))
                 else:
                     raise Exception("bad sample rate.")
-            self.counters[key] += float(fields[0] or 1) * \
-                (1 / float(sample_rate))
+            counter_value = float(fields[0] or 1) * (1 / float(sample_rate))
+            if key not in self.counters:
+                self.counters[key] = 0
+            self.counters[key] += counter_value
             self.stats_seen += 1
         except Exception as err:
             print "error decoding counter event: %s" % err
