@@ -1,6 +1,7 @@
 import eventlet
 from eventlet.green import socket
 from daemonutils import Daemon, readconf
+from sys import maxint
 import optparse
 import time
 import sys
@@ -11,13 +12,24 @@ import re
 class StatsdServer(object):
 
     def __init__(self, conf):
+        TRUE_VALUES = set(('true', '1', 'yes', 'on', 't', 'y'))
+        self.conf = conf
+        self.graphite_host = conf.get('graphite_host', '127.0.0.1')
+        self.graphite_port = int(conf.get('graphite_port', '2003'))
+        self.listen_addr = conf.get('listen_addr', '127.0.0.1')
+        self.listen_port = int(conf.get('listen_port', 8125))
+        if conf.get('debug', True) in TRUE_VALUES:
+            self.debug = True
+        else:
+            self.debug = False
+        self.flush_interval = int(conf.get('flush_interval', 10))
+        self.pct_threshold = int(conf.get('percent_threshold', 90))
+        self.graphite_addr = (self.graphite_host, self.graphite_port)
         self.keycheck = re.compile(r'\s+|/|[^a-zA-Z_\-0-9\.]')
         self.ratecheck = re.compile('^@([\d\.]+)')
         self.counters = {}
         self.timers = {}
-        self.pct_threshold = 90
         self.stats_seen = 0
-        self.debug = True
 
     def report_stats(self, payload):
         """
@@ -26,11 +38,11 @@ class StatsdServer(object):
         :param payload: Data to send to graphite
         """
         if self.debug:
-            print "reporting stats -> %s" % payload
+            print "reporting stats -> {\n%s}" % payload
         try:
             with eventlet.Timeout(5, True) as timeout:
                 graphite = socket.socket()
-                graphite.connect(("127.0.0.1", 2003))
+                graphite.connect(self.graphite_addr)
                 graphite.sendall(payload)
                 graphite.close()
         except Exception as err:
@@ -40,18 +52,17 @@ class StatsdServer(object):
         """
         Periodically flush stats to graphite
         """
-        tstamp = int(time.time())
-        flush_interval = 10 #seconds not milli
         payload = []
         while True:
-            eventlet.sleep(flush_interval)
+            tstamp = int(time.time())
+            eventlet.sleep(self.flush_interval)
             if self.debug:
                 print "seen %d stats so far." % self.stats_seen
                 print "current counters: %s" % self.counters
                 print "flushing to graphite"
             for item in self.counters:
                 stats = 'stats.%s %s %s\n' % (item,
-                            self.counters[item] / flush_interval, tstamp)
+                            self.counters[item] / self.flush_interval, tstamp)
                 stats_counts = 'stats_counts.%s %s %s\n' % (item,
                                     self.counters[item], tstamp)
                 payload.append(stats)
@@ -97,6 +108,9 @@ class StatsdServer(object):
             if key not in self.timers:
                 self.timers[key] = []
             self.timers[key].append(float(fields[0] or 0))
+            if self.stats_seen >= maxint:
+                print "info: hit maxint, reset seen counter"
+                self.stats_seen = 0
             self.stats_seen += 1
         except Exception as err:
             print "error decoding timer event: %s" % err
@@ -119,6 +133,9 @@ class StatsdServer(object):
             if key not in self.counters:
                 self.counters[key] = 0
             self.counters[key] += counter_value
+            if self.stats_seen >= maxint:
+                print "info: hit maxint, reset seen counter"
+                self.stats_seen = 0
             self.stats_seen += 1
         except Exception as err:
             print "error decoding counter event: %s" % err
@@ -150,7 +167,7 @@ class StatsdServer(object):
     def run(self):
         eventlet.spawn_n(self.stats_flush)
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        addr = ('127.0.0.1', 8125)
+        addr = (self.listen_addr, self.listen_port)
         sock.bind(addr)
         buf = 8192
         print "Listening on %s:%d" % addr
