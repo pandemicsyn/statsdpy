@@ -1,6 +1,8 @@
 import eventlet
 from eventlet.green import socket
 from daemonutils import Daemon, readconf
+from logging.handlers import SysLogHandler
+import logging
 from sys import maxint
 import optparse
 import time
@@ -13,6 +15,12 @@ class StatsdServer(object):
 
     def __init__(self, conf):
         TRUE_VALUES = set(('true', '1', 'yes', 'on', 't', 'y'))
+        self.logger = logging.getLogger('statsdpy')
+        self.logger.setLevel(logging.INFO)
+        self.syslog = SysLogHandler(address='/dev/log')
+        self.formatter = logging.Formatter('%(name)s: %(message)s')
+        self.syslog.setFormatter(self.formatter)
+        self.logger.addHandler(self.syslog)
         self.conf = conf
         self.graphite_host = conf.get('graphite_host', '127.0.0.1')
         self.graphite_port = int(conf.get('graphite_port', '2003'))
@@ -46,7 +54,9 @@ class StatsdServer(object):
                 graphite.sendall(payload)
                 graphite.close()
         except Exception as err:
-            print "error connecting to graphite: %s" % err
+            self.logger.critical("error connecting to graphite: %s" % err)
+            if self.debug:
+                print "error connecting to graphite: %s" % err
 
     def stats_flush(self):
         """
@@ -59,7 +69,6 @@ class StatsdServer(object):
             if self.debug:
                 print "seen %d stats so far." % self.stats_seen
                 print "current counters: %s" % self.counters
-                print "flushing to graphite"
             for item in self.counters:
                 stats = 'stats.%s %s %s\n' % (item,
                             self.counters[item] / self.flush_interval, tstamp)
@@ -85,7 +94,7 @@ class StatsdServer(object):
                     payload.append("stats.timers.%s.mean %d ts %d\n" % \
                             (key, mean, tstamp))
                     payload.append("stats.timers.%s.upper %d ts %d\n" % \
-                            (key, max, tstamp))
+                            (key, max_threshold, tstamp))
                     payload.append("stats.timers.%s.upper_%d %d ts %d\n" % \
                             (key, self.pct_threshold, max_threshold, tstamp))
                     payload.append("stats.timers.%s.lower %d ts %d\n" % \
@@ -109,11 +118,13 @@ class StatsdServer(object):
                 self.timers[key] = []
             self.timers[key].append(float(fields[0] or 0))
             if self.stats_seen >= maxint:
-                print "info: hit maxint, reset seen counter"
+                self.logger.info("hit maxint, reset seen counter")
                 self.stats_seen = 0
             self.stats_seen += 1
         except Exception as err:
-            print "error decoding timer event: %s" % err
+            self.logger.info("error decoding timer event: %s" % err)
+            if self.debug:
+                print "error decoding timer event: %s" % err
 
     def process_counter(self, key, fields):
         """
@@ -134,11 +145,13 @@ class StatsdServer(object):
                 self.counters[key] = 0
             self.counters[key] += counter_value
             if self.stats_seen >= maxint:
-                print "info: hit maxint, reset seen counter"
+                self.logger.info("hit maxint, reset seen counter")
                 self.stats_seen = 0
             self.stats_seen += 1
         except Exception as err:
-            print "error decoding counter event: %s" % err
+            self.logger.info("error decoding counter event: %s" % err)
+            if self.debug:
+                print "error decoding counter event: %s" % err
 
     def decode_recvd(self, data):
         """
@@ -153,16 +166,20 @@ class StatsdServer(object):
             fields = bits[1].split("|")
             field_count = len(fields)
             if field_count >= 2:
-                if fields[1] is "ms":
+                if fields[1] == "ms":
                     self.process_timer(key, fields)
-                elif fields[1] is "c":
+                elif fields[1] == "c":
                     self.process_counter(key, fields)
                 else:
-                    print "error: unsupported stats type"
+                    if self.debug:
+                        print "error: unsupported stats type"
+                        print "key -> %s\nfields ->%s" % (key, fields)
             else:
-                print "error: not enough fields received"
+                if self.debug:
+                    print "error: not enough fields received"
         else:
-            print "error: invalid request"
+            if self.debug:
+                print "error: invalid request"
 
     def run(self):
         eventlet.spawn_n(self.stats_flush)
@@ -170,7 +187,9 @@ class StatsdServer(object):
         addr = (self.listen_addr, self.listen_port)
         sock.bind(addr)
         buf = 8192
-        print "Listening on %s:%d" % addr
+        self.logger.info("Listening on %s:%d" % addr)
+        if self.debug:
+            print "Listening on %s:%d" % addr
         while 1:
             data, addr = sock.recvfrom(buf)
             if not data:

@@ -10,9 +10,9 @@ def send_event(payload):
     udp_socket.sendto(payload, addr)
 
 transform_test = 'te$t_key !fix{\)\/?@#%th\'is^&*be"ok'
-good_events = ['testitem:1|c', 'testitem:1|c|@0.5']
+good_events = ['testitem:1|c', 'testitem:1|c|@0.5','timertest:300|ms', 'timertest:400|ms', 'timertest:500|ms']
 crap_events = ['.', ' ', ':', ' : |c', 'baditem:1|k', 'baditem:1|c|@',
-    'baditem:1|c|@wtf', 'baditem:1|c|@05f.6']
+    'baditem:1|c|@wtf', 'baditem:1|c|@05f.6', 'badtimer:5.0f|ms']
 
 def bench(payload, limit):
     for i in xrange(1, limit):
@@ -28,12 +28,15 @@ for event in crap_events:
     send_event(event)
     sleep(.5)
 print "Sending transform [%s]" % transform_test
-
 send_event(transform_test)
 
 print "--> starting benchmark in 5 seconds"
 sleep(5)
-print "--> starting benchmark %s" % datetime.now()
+print "--> starting counter benchmark %s" % datetime.now()
 bench(good_events[1], tosend)
 print "sent %d packets" % tosend
-print "-- complete %s" % datetime.now()
+print "-- counter benchmark complete %s" % datetime.now()
+print "--> starting timer benchmark %s" % datetime.now()
+bench(good_events[2], tosend)
+print "sent %d packets" % tosend
+print "-- timer benchmark complete %s" % datetime.now()
