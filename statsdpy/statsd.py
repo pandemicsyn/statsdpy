@@ -1,6 +1,6 @@
 import eventlet
 from eventlet.green import socket
-from daemonutils import Daemon, readconf
+from statsdpy.daemonutils import Daemon, readconf
 from logging.handlers import SysLogHandler
 import logging
 from sys import maxint
