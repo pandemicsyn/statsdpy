@@ -91,15 +91,15 @@ class StatsdServer(object):
                             int((self.pct_threshold / 100.0) * count)
                         max_threshold = self.timers[key][threshold_index - 1]
                         mean = total / count
-                    payload.append("stats.timers.%s.mean %d ts %d\n" % \
+                    payload.append("stats.timers.%s.mean %d %d\n" % \
                             (key, mean, tstamp))
-                    payload.append("stats.timers.%s.upper %d ts %d\n" % \
+                    payload.append("stats.timers.%s.upper %d %d\n" % \
                             (key, max_threshold, tstamp))
-                    payload.append("stats.timers.%s.upper_%d %d ts %d\n" % \
+                    payload.append("stats.timers.%s.upper_%d %d %d\n" % \
                             (key, self.pct_threshold, max_threshold, tstamp))
-                    payload.append("stats.timers.%s.lower %d ts %d\n" % \
+                    payload.append("stats.timers.%s.lower %d %d\n" % \
                             (key, low, tstamp))
-                    payload.append("stats.timers.%s.count %d ts %d\n" % \
+                    payload.append("stats.timers.%s.count %d %d\n" % \
                             (key, count, tstamp))
                     self.timers[key] = []
             if payload:
