@@ -77,8 +77,10 @@ class StatsdServer(object):
                 payload.append(stats)
                 payload.append(stats_counts)
                 self.counters[item] = 0
+
             for key in self.timers:
                 if len(self.timers[key]) > 0:
+                    self.timers[key].sort()
                     count = len(self.timers[key])
                     low = min(self.timers[key])
                     high = max(self.timers[key])
@@ -94,7 +96,7 @@ class StatsdServer(object):
                     payload.append("stats.timers.%s.mean %d %d\n" % \
                             (key, mean, tstamp))
                     payload.append("stats.timers.%s.upper %d %d\n" % \
-                            (key, max_threshold, tstamp))
+                            (key, high, tstamp))
                     payload.append("stats.timers.%s.upper_%d %d %d\n" % \
                             (key, self.pct_threshold, max_threshold, tstamp))
                     payload.append("stats.timers.%s.lower %d %d\n" % \
