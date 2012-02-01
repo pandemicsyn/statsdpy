@@ -20,6 +20,8 @@ statsdpy sample config:
     #flush_interval = 10
     #calculate XXth percentile
     #percent_threshold = 90
+    #accept multiple events per packet
+    #combined_events = no
 
  - Edit the config file to adjust your to your environment.
  - Start the service: `statsdpy-server start --conf=/path/to/your.conf`
@@ -49,7 +51,13 @@ Another counter, this time add "7" to the "500errors" event bucket.
 
 The "pageload" event took 320ms to complete this time. statsdpy computes the XXth percentile (as specified in the config), average (mean), lower and upper bounds for the configured flush interval.
 
-#### Sampling ####
+### Combined Events ###
+
+Unlike the original implementation this version can also process multiple events per packet. If the config option "combined_events" is enabled multiple metrics can be combined in a single udp packet. Event's need to be separated by a single #:
+
+    pageload:320|ms#failedlogin:5|c
+
+### Sampling ###
 
     statusupdate:107|c|@0.1
 

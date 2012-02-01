@@ -9,6 +9,7 @@ def send_event(payload):
     udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp_socket.sendto(payload, addr)
 
+combined_events = ["testitem:1|c#test2:4|c", "timertest1:200|ms#testitem1:1|c|@0.5"]
 transform_test = 'te$t_key !fix{\)\/?@#%th\'is^&*be"ok'
 good_events = ['testitem:1|c', 'testitem:1|c|@0.5','timertest:300|ms', 'timertest:400|ms', 'timertest:500|ms']
 crap_events = ['.', ' ', ':', ' : |c', 'baditem:1|k', 'baditem:1|c|@',
@@ -18,6 +19,12 @@ def bench(payload, limit):
     for i in xrange(1, limit):
         send_event(payload) 
 
+print "--> %s" % datetime.now()
+for event in combined_events:
+    print "Sending [%s]" % event
+    send_event(event)
+    sleep(.5)
+sleep(2)
 print "--> %s" % datetime.now()
 for event in good_events:
     print "Sending [%s]" % event

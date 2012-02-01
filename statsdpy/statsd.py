@@ -26,10 +26,8 @@ class StatsdServer(object):
         self.graphite_port = int(conf.get('graphite_port', '2003'))
         self.listen_addr = conf.get('listen_addr', '127.0.0.1')
         self.listen_port = int(conf.get('listen_port', 8125))
-        if conf.get('debug', True) in TRUE_VALUES:
-            self.debug = True
-        else:
-            self.debug = False
+        self.debug = conf.get('debug', 'yes') in TRUE_VALUES
+        self.combined_events = conf.get('combined_events', 'no') in TRUE_VALUES
         self.flush_interval = int(conf.get('flush_interval', 10))
         self.pct_threshold = int(conf.get('percent_threshold', 90))
         self.graphite_addr = (self.graphite_host, self.graphite_port)
@@ -192,12 +190,23 @@ class StatsdServer(object):
         self.logger.info("Listening on %s:%d" % addr)
         if self.debug:
             print "Listening on %s:%d" % addr
-        while 1:
-            data, addr = sock.recvfrom(buf)
-            if not data:
-                break
-            else:
-                self.decode_recvd(data)
+        if self.combined_events:
+            if self.debug:
+                print "combined_events mode enabled"
+            while 1:
+                data, addr = sock.recvfrom(buf)
+                if not data:
+                    break
+                else:
+                    for metric in data.split("#"):
+                        self.decode_recvd(metric)
+        else:
+            while 1:
+                data, addr = sock.recvfrom(buf)
+                if not data:
+                    break
+                else:
+                    self.decode_recvd(data)
 
 
 class Statsd(Daemon):
