@@ -101,6 +101,8 @@ class StatsdServer(object):
                             (key, low, tstamp))
                     payload.append("stats.timers.%s.count %d %d\n" % \
                             (key, count, tstamp))
+                    payload.append("stats.timers.%s.total %d %d\n" % \
+                            (key, total, tstamp))
                     self.timers[key] = []
             if payload:
                 self.report_stats("".join(payload))

@@ -71,8 +71,8 @@ This counter is being sampled at a 50% rate.
 
 Clone the version you want and build the package with [stdeb](https://github.com/astraw/stdeb "stdeb") (sudo apt-get install stdeb):
     
-    git clone git@github.com:pandemicsyn/statsdpy.git statsdpy-0.0.3
-    cd statsdlog-0.0.3
-    git checkout 0.0.3
+    git clone git@github.com:pandemicsyn/statsdpy.git statsdpy-0.0.5
+    cd statsdlog-0.0.5
+    git checkout 0.0.5
     python setup.py --command-packages=stdeb.command bdist_deb
-    dpkg -i deb_dist/python-statsdpy_0.0.3-1_all.deb
+    dpkg -i deb_dist/python-statsdpy_0.0.5-1_all.deb
