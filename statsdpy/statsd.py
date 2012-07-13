@@ -109,10 +109,9 @@ class StatsdServer(object):
                     self.timers[key] = []
 
             for key in self.gauges:
-                if len(self.gauges[key]) > 0:
-                    payload.append("stats.gauges.%s %d %d\n" %
-                                   (key, self.gauges[key], int(time.time())))
-                    self.gauges[key] = []
+                payload.append("stats.gauges.%s %d %d\n" %
+                               (key, self.gauges[key], int(time.time())))
+                self.gauges[key] = "0"
 
             if payload:
                 self.report_stats("".join(payload))
@@ -126,9 +125,7 @@ class StatsdServer(object):
         :param fields: Received fields
         """
         try:
-            if key not in self.gauges:
-                self.gauges[key] = []
-            self.gauges[key].append(float(fields[0] or 0))
+            self.gauges[key] = float(fields[0])
             if self.stats_seen >= maxint:
                 self.logger.info("hit maxint, reset seen counter")
                 self.stats_seen = 0
@@ -148,7 +145,7 @@ class StatsdServer(object):
         try:
             if key not in self.timers:
                 self.timers[key] = []
-            self.timers[key].append(float(fields[0] or 0))
+            self.timers[key].append(float(fields[0]))
             if self.stats_seen >= maxint:
                 self.logger.info("hit maxint, reset seen counter")
                 self.stats_seen = 0

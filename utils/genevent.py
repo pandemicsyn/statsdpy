@@ -11,9 +11,9 @@ def send_event(payload):
 
 combined_events = ["comb_testitem:1|c\nctest2:4|c", "ctimertest1:200|ms\nctestitem1:1|c|@0.5"]
 transform_test = 'te$t_key !fix{\)\/?@#%th\'is^&*be"ok'
-good_events = ['testitem:1|c', 'testitem:1|c|@0.5','timertest:300|ms', 'timertest:400|ms', 'timertest:500|ms']
+good_events = ['gtest:100|g', 'gtest:99|g', 'testitem:1|c', 'testitem:1|c|@0.5','timertest:300|ms', 'timertest:400|ms', 'timertest:500|ms']
 crap_events = ['.', ' ', ':', ' : |c', 'baditem:1|k', 'baditem:1|c|@',
-    'baditem:1|c|@wtf', 'baditem:1|c|@05f.6', 'badtimer:5.0f|ms']
+        'baditem:1|c|@wtf', 'baditem:1|c|@05f.6', 'badtimer:5.0f|ms', 'badgauge:K|g']
 
 def bench(payload, limit):
     for i in xrange(1, limit):
