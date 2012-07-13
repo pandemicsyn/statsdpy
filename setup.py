@@ -6,10 +6,6 @@ try:
     import eventlet
 except ImportError:
     install_requires.append("eventlet")
-try:
-    import json
-except ImportError:
-    install_requires.append("simplejson")
 
 name = "statsdpy"
 
@@ -18,7 +14,7 @@ setup(
     version = version,
     author = "Florian Hines",
     author_email = "syn@ronin.io",
-    description = "statsdpy",
+    description = "A simple eventlet based statsd clone",
     license = "Apache License, (2.0)",
     keywords = "statsd",
     url = "http://github.com/pandemicsyn/statsdpy",

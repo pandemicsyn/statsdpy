@@ -3,8 +3,6 @@
 #graphite_port = 2003
 #listen_addr = 127.0.0.1
 #listen_port = 8125
-debug = true
+#debug = no
 #flush_interval = 10
 #percent_threshold = 90
-#accept multiple events per packet
-#combined_events = no

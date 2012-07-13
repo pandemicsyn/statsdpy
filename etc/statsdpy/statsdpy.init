@@ -1,0 +1,30 @@
+#! /bin/sh
+# /etc/init.d/statsdpy
+
+### BEGIN INIT INFO
+# Provides:          statsd
+# Required-Start:    $local_fs $remote_fs $network $syslog
+# Required-Stop:     $local_fs $remote_fs $network $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: starts the statsdpy server
+# Description:       starts the statsdpy server using start-stop-daemon
+### END INIT INFO
+
+# Carry out specific functions when asked to by the system
+case "$1" in
+    start)
+        echo "Starting statsdpy"
+        /usr/bin/statsdpy-server start --conf=/etc/statsd/statsd.conf
+        ;;
+    stop)
+        echo "Stopping statsdpy"
+        /usr/bin/statsdpy-server stop --conf=/etc/statsd/statsd.conf
+        ;;
+    *)
+        echo "Usage: /etc/init.d/statsdpy {start|stop}"
+        exit 1
+        ;;
+esac
+
+exit 0

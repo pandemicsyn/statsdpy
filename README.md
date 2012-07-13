@@ -15,17 +15,15 @@ statsdpy sample config:
     #listen_addr = 127.0.0.1
     #listen_port = 8125
     #Debug mode is enabled by default!
-    #debug = true
+    #debug = no
     #How often to flush stats to graphite 
     #flush_interval = 10
     #calculate XXth percentile
     #percent_threshold = 90
-    #accept multiple events per packet
-    #combined_events = no
 
  - Edit the config file to adjust your to your environment.
  - Start the service: `statsdpy-server start --conf=/path/to/your.conf`
- - Fire some udp counter or timer events at statsdpy
+ - Fire some udp counter, timer, or gauge events at statsdpy
  - Check syslog for any errors starting up or processing events
  - Profit!
 
@@ -51,11 +49,17 @@ Another counter, this time add "7" to the "500errors" event bucket.
 
 The "pageload" event took 320ms to complete this time. statsdpy computes the XXth percentile (as specified in the config), average (mean), lower and upper bounds for the configured flush interval.
 
+#### Gauge (simple arbitrary values)####
+
+    snakes_on_this_mother_farking_plane:12|g
+
 ### Combined Events ###
 
-Unlike the original implementation this version can also process multiple events per packet. If the config option "combined_events" is enabled multiple metrics can be combined in a single udp packet. Event's need to be separated by a single #:
+<s>Unlike the original implementation this version can also process multiple events per packet. If the config option "combined_events" is enabled multiple metrics can be combined in a single udp packet. Events need to be separated by a single "#":</s>
 
-    pageload:320|ms#failedlogin:5|c
+The etsy statsd implementation now supports combined events via seperation by newline. Statsdpy supports this method now as well:
+
+    pageload:320|ms\nfailedlogin:5|c
 
 ### Sampling ###
 
@@ -70,9 +74,19 @@ This counter is being sampled at a 50% rate.
 ### Building packages ###
 
 Clone the version you want and build the package with [stdeb](https://github.com/astraw/stdeb "stdeb") (sudo apt-get install stdeb):
-    
-    git clone git@github.com:pandemicsyn/statsdpy.git statsdpy-0.0.5
-    cd statsdlog-0.0.5
-    git checkout 0.0.5
+
+    git clone git@github.com:pandemicsyn/statsdpy.git statsdpy-0.0.6
+    cd statsdpy-0.0.6
+    git checkout 0.0.6
     python setup.py --command-packages=stdeb.command bdist_deb
-    dpkg -i deb_dist/python-statsdpy_0.0.5-1_all.deb
+    dpkg -i deb_dist/python-statsdpy_0.0.6-1_all.deb
+
+### Installation via setup.py ###
+
+- ``git clone git@github.com:pandemicsyn/statsdpy.git``
+- ``cd statsdpy``
+- ``python setup.py install``
+- Copy the sample config to /etc/statsdpy/statsdpy.conf
+- Edit /etc/statsdpy/statsdpy.conf as required for your environment
+- Start statsdpy ``/usr/bin/statsdpy-server --conf=/etc/statsdpy/statsdpy.conf start``
+- Optionally, a basic init script is provided as etc/statsdpy/statsdpy.init

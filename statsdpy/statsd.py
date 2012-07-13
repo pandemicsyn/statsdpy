@@ -26,8 +26,8 @@ class StatsdServer(object):
         self.graphite_port = int(conf.get('graphite_port', '2003'))
         self.listen_addr = conf.get('listen_addr', '127.0.0.1')
         self.listen_port = int(conf.get('listen_port', 8125))
-        self.debug = conf.get('debug', 'yes') in TRUE_VALUES
-        self.combined_events = conf.get('combined_events', 'no') in TRUE_VALUES
+        self.debug = conf.get('debug', 'no') in TRUE_VALUES
+        self.combined_events = conf.get('special_combined_events', 'no') in TRUE_VALUES
         self.flush_interval = int(conf.get('flush_interval', 10))
         self.pct_threshold = int(conf.get('percent_threshold', 90))
         self.graphite_addr = (self.graphite_host, self.graphite_port)
@@ -35,6 +35,7 @@ class StatsdServer(object):
         self.ratecheck = re.compile('^@([\d\.]+)')
         self.counters = {}
         self.timers = {}
+        self.gauges = {}
         self.stats_seen = 0
 
     def report_stats(self, payload):
@@ -68,10 +69,11 @@ class StatsdServer(object):
                 print "seen %d stats so far." % self.stats_seen
                 print "current counters: %s" % self.counters
             for item in self.counters:
-                stats = 'stats.%s %s %s\n' % (item,
-                            self.counters[item] / self.flush_interval, tstamp)
-                stats_counts = 'stats_counts.%s %s %s\n' % (item,
-                                    self.counters[item], tstamp)
+                stats = 'stats.%s %s %s\n' % \
+                        (item, self.counters[item] / self.flush_interval,
+                         tstamp)
+                stats_counts = 'stats_counts.%s %s %s\n' % \
+                               (item, self.counters[item], tstamp)
                 payload.append(stats)
                 payload.append(stats_counts)
                 self.counters[item] = 0
@@ -91,22 +93,50 @@ class StatsdServer(object):
                             int((self.pct_threshold / 100.0) * count)
                         max_threshold = self.timers[key][threshold_index - 1]
                         mean = total / count
-                    payload.append("stats.timers.%s.mean %d %d\n" % \
-                            (key, mean, tstamp))
-                    payload.append("stats.timers.%s.upper %d %d\n" % \
-                            (key, high, tstamp))
-                    payload.append("stats.timers.%s.upper_%d %d %d\n" % \
-                            (key, self.pct_threshold, max_threshold, tstamp))
-                    payload.append("stats.timers.%s.lower %d %d\n" % \
-                            (key, low, tstamp))
-                    payload.append("stats.timers.%s.count %d %d\n" % \
-                            (key, count, tstamp))
-                    payload.append("stats.timers.%s.total %d %d\n" % \
-                            (key, total, tstamp))
+                    payload.append("stats.timers.%s.mean %d %d\n" %
+                                   (key, mean, tstamp))
+                    payload.append("stats.timers.%s.upper %d %d\n" %
+                                   (key, high, tstamp))
+                    payload.append("stats.timers.%s.upper_%d %d %d\n" %
+                                   (key, self.pct_threshold, max_threshold,
+                                    tstamp))
+                    payload.append("stats.timers.%s.lower %d %d\n" %
+                                   (key, low, tstamp))
+                    payload.append("stats.timers.%s.count %d %d\n" %
+                                   (key, count, tstamp))
+                    payload.append("stats.timers.%s.total %d %d\n" %
+                                   (key, total, tstamp))
                     self.timers[key] = []
+
+            for key in self.gauges:
+                if len(self.gauges[key]) > 0:
+                    payload.append("stats.gauges.%s %d %d\n" %
+                                   (key, self.gauges[key], int(time.time())))
+                    self.gauges[key] = []
+
             if payload:
                 self.report_stats("".join(payload))
                 payload = []
+
+    def process_gauge(self, key, fields):
+        """
+        Process a received gauge event
+
+        :param key: Key of timer
+        :param fields: Received fields
+        """
+        try:
+            if key not in self.gauges:
+                self.gauges[key] = []
+            self.gauges[key].append(float(fields[0] or 0))
+            if self.stats_seen >= maxint:
+                self.logger.info("hit maxint, reset seen counter")
+                self.stats_seen = 0
+            self.stats_seen += 1
+        except Exception as err:
+            self.logger.info("error decoding gauge event: %s" % err)
+            if self.debug:
+                print "error decoding gauge event: %s" % err
 
     def process_timer(self, key, fields):
         """
@@ -172,6 +202,8 @@ class StatsdServer(object):
                     self.process_timer(key, fields)
                 elif fields[1] == "c":
                     self.process_counter(key, fields)
+                elif fields[1] == "g":
+                    self.process_gauge(key, fields)
                 else:
                     if self.debug:
                         print "error: unsupported stats type"
@@ -192,23 +224,14 @@ class StatsdServer(object):
         self.logger.info("Listening on %s:%d" % addr)
         if self.debug:
             print "Listening on %s:%d" % addr
-        if self.combined_events:
-            if self.debug:
-                print "combined_events mode enabled"
-            while 1:
-                data, addr = sock.recvfrom(buf)
-                if not data:
-                    break
-                else:
-                    for metric in data.split("#"):
+        while 1:
+            data, addr = sock.recvfrom(buf)
+            if not data:
+                break
+            else:
+                for metric in data.splitlines():
+                    if metric:
                         self.decode_recvd(metric)
-        else:
-            while 1:
-                data, addr = sock.recvfrom(buf)
-                if not data:
-                    break
-                else:
-                    self.decode_recvd(data)
 
 
 class Statsd(Daemon):
@@ -224,9 +247,9 @@ def run_server():
     '''
     args = optparse.OptionParser(usage)
     args.add_option('--foreground', '-f', action="store_true",
-        help="Run in foreground")
+                    help="Run in foreground")
     args.add_option('--conf', default="./statsd.conf",
-        help="path to config. default = ./statsd.conf")
+                    help="path to config. default = ./statsd.conf")
     options, arguments = args.parse_args()
 
     if len(sys.argv) <= 1:
