@@ -55,8 +55,6 @@ The "pageload" event took 320ms to complete this time. statsdpy computes the XXt
 
 ### Combined Events ###
 
-<s>Unlike the original implementation this version can also process multiple events per packet. If the config option "combined_events" is enabled multiple metrics can be combined in a single udp packet. Events need to be separated by a single "#":</s>
-
 The etsy statsd implementation now supports combined events via seperation by newline. Statsdpy supports this method now as well:
 
     pageload:320|ms\nfailedlogin:5|c
