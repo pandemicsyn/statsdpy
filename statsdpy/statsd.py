@@ -111,7 +111,7 @@ class StatsdServer(object):
             for key in self.gauges:
                 payload.append("stats.gauges.%s %d %d\n" %
                                (key, self.gauges[key], int(time.time())))
-                self.gauges[key] = "0"
+                self.gauges[key] = 0
 
             if payload:
                 self.report_stats("".join(payload))
