@@ -14,7 +14,7 @@ setup(
     version = version,
     author = "Florian Hines",
     author_email = "syn@ronin.io",
-    description = "A simple eventlet based statsd clone",
+    description = "Eventlet based statsd clone with pickle protocol support",
     license = "Apache License, (2.0)",
     keywords = "statsd",
     url = "http://github.com/pandemicsyn/statsdpy",
