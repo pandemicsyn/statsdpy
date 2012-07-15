@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8' />
+    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
+    <meta name="description" content="Statsdpy : A python eventlet based statsd server" />
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Statsdpy</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/pandemicsyn/statsdpy">View on GitHub</a>
+
+          <h1 id="project_title">Statsdpy</h1>
+          <h2 id="project_tagline">A python eventlet based statsd server</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/pandemicsyn/statsdpy/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/pandemicsyn/statsdpy/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <h1>statsdpy</h1>
+
+<p>Simple event based <a href="http://github.com/etsy/statsd">statsd</a> implementation written in python using <a href="http://eventlet.net">eventlet</a> with support for reporting to graphite using the pickle protocol.</p>
+
+<h3>Configuration</h3>
+
+<p>statsdpy sample config with default options:</p>
+
+<pre><code>[main]
+#graphite host and port to connect too
+graphite_host = 127.0.0.1
+graphite_port = 2003
+graphite_pickle_port = 2004
+
+#address and port we should listen for udp packets on
+listen_addr = 127.0.0.1
+listen_port = 8125
+
+#If you track a large number of metrics you can use the pickle protocol
+pickle_protocol = no
+#max number of metrics to report in one go when using the pickle protocol
+pickle_batch_size = 300
+
+#enabling debug mode and running in the foreground (with -f) is a great way
+#to debug an app generating new metrics
+debug = no
+
+#How often to flush stats to graphite
+flush_interval = 10
+#calculate the XXth percentile
+percent_threshold = 90
+</code></pre>
+
+<ul>
+<li>Edit the config file appropriately for your environment</li>
+<li>Start the service: <code>statsdpy-server start --conf=/path/to/your.conf</code>
+</li>
+<li>Fire some udp counter, timer, or gauge events at statsdpy</li>
+<li>Check syslog for any errors starting up or processing events</li>
+<li>Profit!</li>
+</ul><h3>Reporting using the pickle protocol</h3>
+
+<p>If you track a decent # of metrics you wanna switch to report to graphite using the <a href="http://graphite.readthedocs.org/en/latest/feeding-carbon.html#the-pickle-protocol">pickle protocol</a>. The pickle protocol is more efficient than the the plaintext protocol, and supports sending batches of metrics to carbon in one go. To enable it just set  <code>pickle_protocol</code> to "yes" in your statsdpy.conf. Optionally, you can also adjust the max number of items per batch that is reported by adjusting the <code>pickle_batch_size</code> conf option.</p>
+
+<h3>Event Types</h3>
+
+<p>As with the original statsd implementation from <a href="https://github.com/etsy/statsd">etsy</a> the following event types are supported:</p>
+
+<h4>Counter</h4>
+
+<pre><code>sitelogins:1|c
+</code></pre>
+
+<p>Simple counters. Add 1 to the "sitelogins" event bucket. It stays in memory until flushed to graphite as specified by the flush_interval.</p>
+
+<pre><code>500errors:7|c
+</code></pre>
+
+<p>Another counter, this time add "7" to the "500errors" event bucket.</p>
+
+<h4>Timer</h4>
+
+<pre><code>pageload:320|ms
+</code></pre>
+
+<p>The "pageload" event took 320ms to complete this time. statsdpy computes the XXth percentile (as specified in the config), average (mean), lower and upper bounds for the configured flush interval.</p>
+
+<h4>Gauge (simple arbitrary values)</h4>
+
+<pre><code>snakes_on_this_mother_farking_plane:12|g
+</code></pre>
+
+<h3>Combined Events</h3>
+
+<p>The etsy statsd implementation now supports combined events via seperation by newline. Statsdpy supports this method now as well:</p>
+
+<pre><code>pageload:320|ms\nfailedlogin:5|c
+</code></pre>
+
+<h3>Sampling</h3>
+
+<pre><code>statusupdate:107|c|@0.1
+</code></pre>
+
+<p>This counter is being sent sampled every 1/10th of the time.</p>
+
+<pre><code>404error:3|c|@0.5
+</code></pre>
+
+<p>This counter is being sampled at a 50% rate.</p>
+
+<h3>Building .deb packages</h3>
+
+<p>Clone the repo  and build the package with <a href="https://github.com/astraw/stdeb" title="stdeb">stdeb</a> (sudo apt-get install stdeb):</p>
+
+<pre><code>git clone git@github.com:pandemicsyn/statsdpy.git
+cd statsdpy
+python setup.py --command-packages=stdeb.command bdist_deb
+dpkg -i deb_dist/python-statsdpy_0.0.X-1_all.deb
+</code></pre>
+
+<h3>Installation via setup.py</h3>
+
+<ul>
+<li><code>git clone git@github.com:pandemicsyn/statsdpy.git</code></li>
+<li><code>cd statsdpy</code></li>
+<li><code>python setup.py install</code></li>
+<li>Copy the sample config to /etc/statsdpy/statsdpy.conf</li>
+<li>Edit /etc/statsdpy/statsdpy.conf as required for your environment</li>
+<li>Start statsdpy <code>/usr/bin/statsdpy-server --conf=/etc/statsdpy/statsdpy.conf start</code>
+</li>
+<li>Optionally, a basic init script is provided as etc/statsdpy/statsdpy.init</li>
+</ul>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Statsdpy maintained by <a href="https://github.com/pandemicsyn">pandemicsyn</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+              <script type="text/javascript">
+            var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+            document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+          </script>
+          <script type="text/javascript">
+            try {
+              var pageTracker = _gat._getTracker("UA-1847891-10");
+            pageTracker._trackPageview();
+            } catch(err) {}
+          </script>
+
+
+  </body>
+</html>
