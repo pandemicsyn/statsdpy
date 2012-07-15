@@ -8,17 +8,18 @@ Its a work in progress but the basics are there.
 statsdpy sample config:
 
     [main]
-    #graphite host and port to connect too.
     #graphite_host = 127.0.0.1
     #graphite_port = 2003
-    #address and port we should listen for udp packets on
+    #graphite_pickle_port = 2004
     #listen_addr = 127.0.0.1
     #listen_port = 8125
-    #Debug mode is enabled by default!
+    #If you track a large number of metrics you should you should report using
+    #graphites pickle protocol. In that case switch this to yes to enable it.
+    #pickle_protocol = no
+    #max number of metrics to report in one go when using the pickle protocol.
+    #pickle_batch_size = 300
     #debug = no
-    #How often to flush stats to graphite 
     #flush_interval = 10
-    #calculate XXth percentile
     #percent_threshold = 90
 
  - Edit the config file to adjust your to your environment.
@@ -28,6 +29,10 @@ statsdpy sample config:
  - Profit!
 
 Its important to note that statsdpy runs in debug mode by default (at least for now). So if you wont be running it in the foreground with the `-f|--foreground` flag you might wanna set `debug = false` in your config. However, running with debug enabled and in the foreground makes it very handy for debuging new statsd clients/events (just dont point it at a valid graphite host).
+
+### Reporting using the pickle protocol ###
+
+If you track a decent # of metrics you may wish to switch to reporting using Graphites [pickle protocol](http://graphite.readthedocs.org/en/latest/feeding-carbon.html#the-pickle-protocol). The pickle protocol is a much more efficient take on the plaintext protocol, and supports sending batches of metrics to Carbon in one go. To enable it just set  ``pickle_protocol`` to "yes" in your statsdpy.conf. Optionally, you can also adjust the max number of items per batch that is reported by adjusting the ``pickle_batch_size`` conf option.
 
 ### Event Types ###
 
