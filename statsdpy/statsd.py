@@ -14,7 +14,6 @@ import re
 
 
 class StatsdServer(object):
-
     def __init__(self, conf):
         TRUE_VALUES = set(('true', '1', 'yes', 'on', 't', 'y'))
         self.logger = logging.getLogger('statsdpy')
@@ -44,6 +43,11 @@ class StatsdServer(object):
         self.timers = {}
         self.gauges = {}
         self.stats_seen = 0
+        self.processors = {
+            'g': self.process_gauge,
+            'c': self.process_counter,
+            'ms': self.process_timer,
+        }
 
     def _get_batches(self, items):
         """given a list yield list at most self.max_batch_size in size"""
@@ -266,26 +270,20 @@ class StatsdServer(object):
         bits = data.split(':')
         if len(bits) == 2:
             key = self.keycheck.sub('_', bits[0])
-            print "got key: %s" % key
             fields = bits[1].split("|")
             field_count = len(fields)
             if field_count >= 2:
-                if fields[1] == "ms":
-                    self.process_timer(key, fields)
-                elif fields[1] == "c":
-                    self.process_counter(key, fields)
-                elif fields[1] == "g":
-                    self.process_gauge(key, fields)
+                processor = self.processors.get(fields[1])
+                if processor:
+                    print "got key: %s %r" % (key, fields)
+                    processor(key, fields)
                 else:
-                    if self.debug:
-                        print "error: unsupported stats type"
-                        print "key -> %s\nfields ->%s" % (key, fields)
+                    print "error: unsupported stats type"
+                    print "key -> %s\nfields ->%s" % (key, fields)
             else:
-                if self.debug:
-                    print "error: not enough fields received"
+                print "error (%s): not enough fields received" % key
         else:
-            if self.debug:
-                print "error: invalid request"
+            print "error: invalid request [%s]" % data[:40]
 
     def run(self):
         eventlet.spawn_n(self.stats_flush)
@@ -337,7 +335,10 @@ def run_server():
         print "Running in foreground."
         conf = readconf(options.conf)
         statsd = StatsdServer(conf['main'])
-        statsd.run()
+        try:
+            statsd.run()
+        except KeyboardInterrupt:
+            print ''  # in testing, you'll see "^C<prompt>" w/o this
         sys.exit(0)
 
     if len(sys.argv) >= 2:
