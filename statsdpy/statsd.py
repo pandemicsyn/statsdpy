@@ -300,6 +300,8 @@ class StatsdServer(object):
                 break
             else:
                 for metric in data.splitlines():
+                    print data
+                    print metric
                     if metric:
                         self.decode_recvd(metric)
 
