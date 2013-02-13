@@ -80,9 +80,13 @@ This counter is being sent sampled every 1/10th of the time.
 
 This counter is being sampled at a 50% rate.
 
+### Requirements ###
+
+- eventlet
+
 ### Building .deb packages ###
 
-Clone the repo  and build the package with [stdeb](https://github.com/astraw/stdeb "stdeb") (sudo apt-get install stdeb):
+Clone the repo  and build the package with [stdeb](https://github.com/astraw/stdeb "stdeb") (sudo apt-get install python-stdeb):
 
     git clone git@github.com:pandemicsyn/statsdpy.git
     cd statsdpy
