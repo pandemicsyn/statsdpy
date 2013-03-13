@@ -30,6 +30,13 @@ statsdpy sample config with default options:
     #calculate the XXth percentile
     percent_threshold = 90
 
+    # Override the key prefixes and suffixes - see https://github.com/etsy/statsd/blob/master/docs/namespacing.md
+    legacy_namespace = False
+    global_prefix = stats
+    prefix_counter = counters
+    prefix_timer = timers
+    prefix_gauge = gauges
+
  - Edit the config file appropriately for your environment
  - Start the service: `statsdpy-server start --conf=/path/to/your.conf`
  - Fire some udp counter, timer, or gauge events at statsdpy
