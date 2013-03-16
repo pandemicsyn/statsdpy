@@ -30,8 +30,9 @@ statsdpy sample config with default options:
     #calculate the XXth percentile
     percent_threshold = 90
 
-    # Override the key prefixes and suffixes - see https://github.com/etsy/statsd/blob/master/docs/namespacing.md
-    legacy_namespace = False
+    # Override the key prefixes and suffixes - see
+    # https://github.com/etsy/statsd/blob/master/docs/namespacing.md
+    legacy_namespace = true
     global_prefix = stats
     prefix_counter = counters
     prefix_timer = timers
@@ -42,6 +43,10 @@ statsdpy sample config with default options:
  - Fire some udp counter, timer, or gauge events at statsdpy
  - Check syslog for any errors starting up or processing events
  - Profit!
+
+### Metric Namespacing ###
+
+Important Note: We default to legacy namespacing at the moment but will probably switch in the near future - see [Metric namespacing](https://github.com/etsy/statsd/blob/master/docs/namespacing.md) for further information.
 
 ### Reporting using the pickle protocol ###
 

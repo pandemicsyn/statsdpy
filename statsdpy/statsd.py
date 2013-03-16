@@ -57,7 +57,7 @@ class StatsdServer(object):
         :param dict conf: The configuration data
 
         """
-        if conf.get('legacy_namespace') in self.TRUE_VALUES:
+        if conf.get('legacy_namespace', 'y') in self.TRUE_VALUES:
             self.count_prefix = 'stats_counts'
             self.count_suffix = ''
             self.gauge_prefix = 'stats.gauges'

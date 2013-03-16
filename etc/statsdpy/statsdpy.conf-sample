@@ -23,8 +23,9 @@ flush_interval = 10
 #calculate the XXth percentile
 percent_threshold = 90
 
-# Override the key prefixes and suffixes - see https://github.com/etsy/statsd/blob/master/docs/namespacing.md
-legacy_namespace = False
+# Override the key prefixes and suffixes - see:
+# https://github.com/etsy/statsd/blob/master/docs/namespacing.md
+legacy_namespace = true
 global_prefix = stats
 prefix_counter = counters
 prefix_timer = timers
