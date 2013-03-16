@@ -14,8 +14,8 @@ import re
 
 
 class StatsdServer(object):
+    TRUE_VALUES = set(('true', '1', 'yes', 'on', 't', 'y'))
     def __init__(self, conf):
-        TRUE_VALUES = set(('true', '1', 'yes', 'on', 't', 'y'))
         self.logger = logging.getLogger('statsdpy')
         self.logger.setLevel(logging.INFO)
         self.syslog = SysLogHandler(address='/dev/log')
@@ -26,13 +26,14 @@ class StatsdServer(object):
         self.graphite_host = conf.get('graphite_host', '127.0.0.1')
         self.graphite_port = int(conf.get('graphite_port', '2003'))
         self.graphite_pport = int(conf.get('graphite_pickle_port', '2004'))
-        self.pickle_proto = conf.get('pickle_protocol', 'no') in TRUE_VALUES
+        self.pickle_proto = conf.get('pickle_protocol') in self.TRUE_VALUES
         self.max_batch_size = int(conf.get('pickle_batch_size', '300'))
         self.listen_addr = conf.get('listen_addr', '127.0.0.1')
         self.listen_port = int(conf.get('listen_port', 8125))
-        self.debug = conf.get('debug', 'no') in TRUE_VALUES
+        self.debug = conf.get('debug') in self.TRUE_VALUES
         self.flush_interval = int(conf.get('flush_interval', 10))
         self.pct_threshold = int(conf.get('percent_threshold', 90))
+        self.threshold_numerator = float(self.pct_threshold / 100.0)
         if self.pickle_proto:
             self.graphite_addr = (self.graphite_host, self.graphite_pport)
         else:
@@ -48,6 +49,33 @@ class StatsdServer(object):
             'c': self.process_counter,
             'ms': self.process_timer,
         }
+        self._set_prefixes(conf)
+
+    def _set_prefixes(self, conf):
+        """Set the graphite key prefixes
+
+        :param dict conf: The configuration data
+
+        """
+        if conf.get('legacy_namespace') in self.TRUE_VALUES:
+            self.count_prefix = 'stats_counts'
+            self.count_suffix = ''
+            self.gauge_prefix = 'stats.gauges'
+            self.timer_prefix = 'stats.timers'
+            self.rate_prefix = 'stats'
+            self.rate_suffix = ''
+        else:
+            global_prefix = conf.get('global_prefix', 'stats')
+            self.count_prefix = '%s.%s' % (global_prefix,
+                                           conf.get('prefix_counter',
+                                                    'counters'))
+            self.count_suffix = '.count'
+            self.gauge_prefix = '%s.%s' % (global_prefix,
+                                           conf.get('prefix_gauge', 'gauges'))
+            self.timer_prefix = '%s.%s' % (global_prefix,
+                                           conf.get('prefix_timer', 'timers'))
+            self.rate_prefix = self.count_prefix
+            self.rate_suffix = '.rate'
 
     def _get_batches(self, items):
         """given a list yield list at most self.max_batch_size in size"""
@@ -66,7 +94,7 @@ class StatsdServer(object):
             else:
                 print "reporting stats -> {\n%s}" % payload
         try:
-            with eventlet.Timeout(5, True) as timeout:
+            with eventlet.Timeout(5, True):
                 graphite = socket.socket()
                 graphite.connect(self.graphite_addr)
                 graphite.sendall(payload)
@@ -99,98 +127,68 @@ class StatsdServer(object):
         """obtain stats payload in batches of pickle format"""
         tstamp = int(time.time())
         payload = []
+
         for item in self.counters:
-            stats = (tstamp, self.counters[item] / self.flush_interval)
-            payload.append(("stats.%s" % item, stats))
-            stats = (tstamp, self.counters[item])
-            payload.append(("stats_counts.%s" % item, stats))
+            payload.append(("%s.%s%s" % (self.rate_prefix, item,
+                                         self.rate_suffix),
+                            (tstamp,
+                             self.counters[item] / self.flush_interval)))
+            payload.append(("%s.%s%s" % (self.count_prefix, item,
+                                         self.count_suffix),
+                            (tstamp, self.counters[item])))
             self.counters[item] = 0
+
         for key in self.timers:
             if len(self.timers[key]) > 0:
-                self.timers[key].sort()
-                count = len(self.timers[key])
-                low = min(self.timers[key])
-                high = max(self.timers[key])
-                total = sum(self.timers[key])
-                mean = low
-                max_threshold = high
-                tstamp = int(time.time())
-                if count > 1:
-                    threshold_index = \
-                        int((self.pct_threshold / 100.0) * count)
-                    max_threshold = self.timers[key][threshold_index - 1]
-                    mean = total / count
-                payload.append(("stats.timers.%s.mean" % key, (tstamp, mean)))
-                payload.append(("stats.timers.%s.upper" % key, (tstamp, high)))
-                payload.append(("stats.timers.%s.upper_%d" %
-                               (key, self.pct_threshold),
-                               (tstamp, max_threshold)))
-                payload.append(("stats.timers.%s.lower" % key, (tstamp, low)))
-                payload.append(("stats.timers.%s.count" % key, (tstamp,
-                                                                count)))
-                payload.append(("stats.timers.%s.mean" % key, (tstamp, total)))
+                self.process_timer_key(key, tstamp, payload)
                 self.timers[key] = []
+
         for key in self.gauges:
-            payload.append(("stats.gauges.%s" % key, (tstamp,
-                                                      self.gauges[key])))
+            payload.append(("%s.%s" % (self.gauge_prefix, key),
+                            (tstamp, self.gauges[key])))
             self.gauges[key] = 0
+
         if payload:
             batched_payload = []
             for batch in self._get_batches(payload):
                 if self.debug:
-                    print "pickling batch: %s" % batch
+                    print "pickling batch: %r" % batch
                 serialized_data = pickle.dumps(batch, protocol=-1)
                 length_prefix = struct.pack("!L", len(serialized_data))
                 batched_payload.append(length_prefix + serialized_data)
             return batched_payload
-        else:
-            return None
+        return None
 
     def plain_payload(self):
         """obtain stats payload in plaintext format"""
         tstamp = int(time.time())
         payload = []
         for item in self.counters:
-            stats = 'stats.%s %s %s\n' % \
-                    (item, self.counters[item] / self.flush_interval,
-                     tstamp)
-            stats_counts = 'stats_counts.%s %s %s\n' % \
-                           (item, self.counters[item], tstamp)
-            payload.append(stats)
-            payload.append(stats_counts)
+            payload.append('%s.%s%s %s %s\n' % (self.rate_prefix,
+                                                item,
+                                                self.rate_suffix,
+                                                self.counters[item] /
+                                                self.flush_interval,
+                                                tstamp))
+            payload.append('%s.%s%s %s %s\n' % (self.count_prefix,
+                                                item,
+                                                self.count_suffix,
+                                                self.counters[item],
+                                                tstamp))
             self.counters[item] = 0
+
         for key in self.timers:
             if len(self.timers[key]) > 0:
-                self.timers[key].sort()
-                count = len(self.timers[key])
-                low = min(self.timers[key])
-                high = max(self.timers[key])
-                total = sum(self.timers[key])
-                mean = low
-                max_threshold = high
-                tstamp = int(time.time())
-                if count > 1:
-                    threshold_index = int((self.pct_threshold / 100.0) * count)
-                    max_threshold = self.timers[key][threshold_index - 1]
-                    mean = total / count
-                payload.append("stats.timers.%s.mean %d %d\n" %
-                               (key, mean, tstamp))
-                payload.append("stats.timers.%s.upper %d %d\n" %
-                               (key, high, tstamp))
-                payload.append("stats.timers.%s.upper_%d %d %d\n" %
-                               (key, self.pct_threshold, max_threshold,
-                                tstamp))
-                payload.append("stats.timers.%s.lower %d %d\n" %
-                               (key, low, tstamp))
-                payload.append("stats.timers.%s.count %d %d\n" %
-                               (key, count, tstamp))
-                payload.append("stats.timers.%s.total %d %d\n" %
-                               (key, total, tstamp))
-                self.timers[key] = []
+                self.process_timer_key(key, tstamp, payload)
+
         for key in self.gauges:
-            payload.append("stats.gauges.%s %d %d\n" %
-                           (key, self.gauges[key], int(time.time())))
+            payload.append("%s.%s %d %d\n" % (self.gauge_prefix, key,
+                                              self.gauges[key], tstamp))
             self.gauges[key] = 0
+
+        if self.debug:
+            print payload
+
         if payload:
             return "".join(payload)
         else:
@@ -261,6 +259,39 @@ class StatsdServer(object):
             if self.debug:
                 print "error decoding counter event: %s" % err
 
+    def process_timer_key(self, key, tstamp, stack, pickled=False):
+        """Append the plain text graphite
+
+        :param str key: The timer key to process
+        :param int tstamp: The timestamp for the data point
+        :param list stack: The stack of metrics to append the output to
+
+        """
+        self.timers[key].sort()
+        values = {'count': len(self.timers[key]),
+                  'low': min(self.timers[key]),
+                  'high': max(self.timers[key]),
+                  'total': sum(self.timers[key])}
+        values['mean'] = values['low']
+        nth_percentile = 'upper_%i' % self.pct_threshold
+        values[nth_percentile] = values['high']
+
+        if values['count']:
+            threshold_idx = int(self.threshold_numerator * values['count']) - 1
+            values[nth_percentile] = self.timers[key][threshold_idx]
+            values['mean'] = float(values['total']) / float(values['count'])
+
+        for metric in values:
+            if pickled:
+                stack.append(("%s.%s.%s" % (self.timer_prefix, key, metric),
+                              (tstamp, values[metric])))
+            else:
+                stack.append("%s.%s.%s %s %s\n" % (self.timer_prefix,
+                                                   key,
+                                                   metric,
+                                                   values[metric],
+                                                   tstamp))
+
     def decode_recvd(self, data):
         """
         Decode and process the data from a received event.
@@ -275,7 +306,8 @@ class StatsdServer(object):
             if field_count >= 2:
                 processor = self.processors.get(fields[1])
                 if processor:
-                    print "got key: %s %r" % (key, fields)
+                    if self.debug:
+                        print "got key: %s %r" % (key, fields)
                     processor(key, fields)
                 else:
                     print "error: unsupported stats type"
@@ -300,8 +332,6 @@ class StatsdServer(object):
                 break
             else:
                 for metric in data.splitlines():
-                    print data
-                    print metric
                     if metric:
                         self.decode_recvd(metric)
 
