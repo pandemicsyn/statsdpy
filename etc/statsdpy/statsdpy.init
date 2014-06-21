@@ -15,11 +15,11 @@
 case "$1" in
     start)
         echo "Starting statsdpy"
-        /usr/bin/statsdpy-server start --conf=/etc/statsd/statsd.conf
+        /usr/bin/statsdpy-server start --conf=/etc/statsdpy/statsdpy.conf
         ;;
     stop)
         echo "Stopping statsdpy"
-        /usr/bin/statsdpy-server stop --conf=/etc/statsd/statsd.conf
+        /usr/bin/statsdpy-server stop --conf=/etc/statsdpy/statsdpy.conf
         ;;
     *)
         echo "Usage: /etc/init.d/statsdpy {start|stop}"
