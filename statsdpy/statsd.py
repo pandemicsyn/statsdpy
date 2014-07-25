@@ -159,7 +159,7 @@ class StatsdServer(object):
 
         for key in self.timers:
             if len(self.timers[key]) > 0:
-                self.process_timer_key(key, tstamp, payload)
+                self.process_timer_key(key, tstamp, payload, pickled=True)
                 self.timers[key] = []
 
         for key in self.gauges:
