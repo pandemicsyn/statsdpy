@@ -159,7 +159,7 @@ class StatsdServer(object):
 
         for key in self.timers:
             if len(self.timers[key]) > 0:
-                self.process_timer_key(key, tstamp, payload)
+                self.process_timer_key(key, tstamp, payload, pickled=True)
                 self.timers[key] = []
 
         for key in self.gauges:
@@ -369,13 +369,16 @@ class Statsd(Daemon):
 
 def run_server():
     usage = '''
-    %prog start|stop|restart [--conf=/path/to/some.conf] [--foreground|-f]
+    %prog start|stop|restart [--conf=/path/to/some.conf] [--foreground|-f] \
+[--pid=/path/to/pid]
     '''
     args = optparse.OptionParser(usage)
     args.add_option('--foreground', '-f', action="store_true",
                     help="Run in foreground")
     args.add_option('--conf', default="./statsd.conf",
                     help="path to config. default = ./statsd.conf")
+    args.add_option('--pid', default="/tmp/statsd.pid",
+                    help="path to pid file. default = /tmp/statsd.pid")
     options, arguments = args.parse_args()
 
     if len(sys.argv) <= 1:
@@ -398,7 +401,7 @@ def run_server():
         sys.exit(0)
 
     if len(sys.argv) >= 2:
-        statsdaemon = Statsd('/tmp/statsd.pid')
+        statsdaemon = Statsd(options.pid)
         if 'start' == sys.argv[1]:
             conf = readconf(options.conf)
             statsdaemon.start(conf['main'])
