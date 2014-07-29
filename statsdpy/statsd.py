@@ -19,7 +19,8 @@ class StatsdServer(object):
     def __init__(self, conf):
         self.logger = logging.getLogger('statsdpy')
         self.logger.setLevel(logging.INFO)
-        self.syslog = SysLogHandler(address='/dev/log')
+        address = '/dev/log' if sys.platform != "darwin" else '/var/run/syslog'
+        self.syslog = SysLogHandler(address=address)
         self.formatter = logging.Formatter('%(name)s: %(message)s')
         self.syslog.setFormatter(self.formatter)
         self.logger.addHandler(self.syslog)
